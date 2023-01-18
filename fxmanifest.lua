@@ -5,6 +5,8 @@ author 'Valencia Modifcations'
 description 'Legacy Fuel for ND_Core'
 version '1.3'
 
+-- Source https://github.com/ValenciaModifcations/VN_Fuel
+
 -- What to run
 client_scripts {
 	'config.lua',
