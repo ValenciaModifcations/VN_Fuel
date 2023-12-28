@@ -9,3 +9,8 @@ The Jerrycan function has not been tested and may not work- but the vehicle refu
 2) Drag & drop the folder into your `resources` server folder.
 3) Configure the config file to your liking.
 4) Add `start VN_Fuel` to your server config.
+
+
+### No Longer Supported
+
+If someone would like to take over, please reach out on discord. overseershawn
