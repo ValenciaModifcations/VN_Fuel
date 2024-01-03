@@ -4,6 +4,9 @@ Config = {}
 Config.JerryCanCost = 100
 Config.RefillCost = 50 -- If it is missing half of it capacity, this amount will be divided in half, and so on.
 
+-- Display Refuel Info For 3 Seconds After Done
+Config.WaitTimeAfterRefuel = 3000
+
 -- Fuel decor - No need to change this, just leave it.
 Config.FuelDecor = "_FUEL_LEVEL"
 
@@ -17,88 +20,91 @@ Config.EnableHUD = true
 Config.ShowNearestGasStationOnly = false
 Config.ShowAllGasStations = true
 
--- Modify the fuel-cost here, using a multiplier value. Setting the value to 2.0 would cause a doubled increase.
-Config.CostMultiplier = 0.3
-
--- Configure the strings as you wish here.
 Config.Strings = {
 	ExitVehicle = "Exit the vehicle to refuel",
 	EToRefuel = "Press ~g~E ~w~to refuel vehicle",
 	JerryCanEmpty = "Jerry can is empty",
 	FullTank = "Tank is full",
-	PurchaseJerryCan = "Press ~g~E ~w~to purchase a jerry can for ~g~$" .. Config.JerryCanCost,
+	PurchaseJerryCan = "You purchased a jerry can for ~g~$" .. Config.JerryCanCost,
 	CancelFuelingPump = "Press ~g~E ~w~to cancel the fueling",
 	CancelFuelingJerryCan = "Press ~g~E ~w~to cancel the fueling",
-	NotEnoughCash = "Not enough cash",
-	RefillJerryCan = "Press ~g~E ~w~ to refill the jerry can for ",
-	NotEnoughCashJerryCan = "Not enough cash to refill jerry can",
-	JerryCanFull = "Jerry can is full",
+	NotEnoughCash = "~r~Not enough cash",
+	RefillJerryCan = "You refilled the jerry can for ",
+	NotEnoughCashJerryCan = "~r~Not enough cash to refill jerry can",
+	JerryCanFull = "~g~Jerry can is full",
 	TotalCost = "Cost",
 }
 
 if not Config.UseESX then
-	Config.Strings.PurchaseJerryCan = "Press ~g~E ~w~to grab a jerry can"
-	Config.Strings.RefillJerryCan = "Press ~g~E ~w~ to refill the jerry can"
+	Config.Strings.PurchaseJerryCan = "You purchased a jerry can"
+	Config.Strings.RefillJerryCan = "You refilled the jerry can"
 end
-
-Config.PumpModels = {
-	[-2007231801] = true,
-	[1339433404] = true,
-	[1694452750] = true,
-	[1933174915] = true,
-	[-462817101] = true,
-	[-469694731] = true,
-	[-164877493] = true
-}
 
 -- Blacklist certain vehicles. Use names or hashes. https://wiki.gtanet.work/index.php?title=Vehicle_Models
 Config.Blacklist = {
 	--"Adder",
 	--276773164
+	"as350"
+}
+
+Config.FuelTypes = {
+    [87] = { currentPrice = 1.50 },
+    [89] = { currentPrice = 1.70 },
+    [91] = { currentPrice = 1.90 },
+}
+
+Config.gasPumpModels = {
+	"prop_gas_pump_1d",
+	"prop_gas_pump_1a",
+	"prop_gas_pump_1b",
+	"prop_gas_pump_1c",
+	"prop_vintage_pump",
+	"prop_gas_pump_old2",
+	"prop_gas_pump_old3"
 }
 
 -- Do you want the HUD removed from showing in blacklisted vehicles?
 Config.RemoveHUDForBlacklistedVehicle = true
 
--- Class multipliers. If you want SUVs to use less fuel, you can change it to anything under 1.0, and vise versa.
+-- Class multipliers. Adjust these to change fuel consumption for different vehicle classes.
 Config.Classes = {
-	[0] = 1.0, -- Compacts
-	[1] = 1.0, -- Sedans
-	[2] = 1.0, -- SUVs
-	[3] = 1.0, -- Coupes
-	[4] = 1.0, -- Muscle
-	[5] = 1.0, -- Sports Classics
-	[6] = 1.0, -- Sports
-	[7] = 1.0, -- Super
-	[8] = 1.0, -- Motorcycles
-	[9] = 1.0, -- Off-road
-	[10] = 1.0, -- Industrial
-	[11] = 1.0, -- Utility
-	[12] = 1.0, -- Vans
-	[13] = 0.0, -- Cycles
+	[0] = 0.8, -- Compacts
+	[1] = 1.1, -- Sedans
+	[2] = 1.5, -- SUVs 
+	[3] = 0.9, -- Coupes
+	[4] = 1.5, -- Muscle 
+	[5] = 1.2, -- Sports Classics
+	[6] = 1.3, -- Sports
+	[7] = 1.4, -- Super
+	[8] = 1.8, -- Motorcycles
+	[9] = 1.3, -- Off-road 
+	[10] = 1.9, -- Industrial
+	[11] = 1.5, -- Utility
+	[12] = 1.4, -- Vans
+	[13] = 0.0, -- Cycles 
 	[14] = 1.0, -- Boats
 	[15] = 1.0, -- Helicopters
 	[16] = 1.0, -- Planes
 	[17] = 1.0, -- Service
-	[18] = 1.0, -- Emergency
+	[18] = 0.6, -- Emergency
 	[19] = 1.0, -- Military
 	[20] = 1.0, -- Commercial
 	[21] = 1.0, -- Trains
 }
 
--- The left part is at percentage RPM, and the right is how much fuel (divided by 10) you want to remove from the tank every second
+-- Fuel usage based on RPM percentages. Adjust as needed.
 Config.FuelUsage = {
-	[1.0] = 1.2,
-	[0.9] = 1.0,
-	[0.8] = 0.8,
-	[0.7] = 0.7,
-	[0.6] = 0.6,
-	[0.5] = 0.5,
-	[0.4] = 0.4,
-	[0.3] = 0.3,
-	[0.2] = 0.2,
-	[0.1] = 0.2,
-	[0.0] = 0.0,
+	[1.0] = 1.2, -- 100% RPM
+	[0.9] = 1.0, -- 90% RPM
+	[0.8] = 0.8, -- 80% RPM
+	[0.7] = 0.7, -- 70% RPM
+	[0.6] = 0.6, -- 60% RPM
+	[0.5] = 0.5, -- 50% RPM
+	[0.4] = 0.4, -- 40% RPM
+	[0.3] = 0.3, -- 30% RPM
+	[0.2] = 0.2, -- 20% RPM
+	[0.1] = 0.2, -- 10% RPM
+	[0.0] = 0.01, -- Idle (No fuel consumption)
 }
 
 Config.GasStations = {

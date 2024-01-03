@@ -1,142 +1,197 @@
-NDCore = exports["ND_Core"]:GetCoreObject()
-local isNearPump = false
-local isFueling = false
-local currentFuel = 0.0
-local currentCost = 0.0
-local currentCash = 0 
-local fuelSynced = false
-local inBlacklisted = false
-
-local character = NDCore.Functions.GetSelectedCharacter()
+local isFueling, currentFuel, currentCost, fuelSynced, inBlacklisted, ShutOffPump = false, 0.0, 0.0, false, false, false
+local target = exports.ox_target
 
 function ManageFuelUsage(vehicle)
-	if not DecorExistOn(vehicle, Config.FuelDecor) then
-		SetFuel(vehicle, math.random(200, 800) / 10)
-	elseif not fuelSynced then
-		SetFuel(vehicle, GetFuel(vehicle))
+    local fuelLevel = DecorExistOn(vehicle, Config.FuelDecor) and GetFuel(vehicle) or math.random(20, 80) / 10
+    SetFuel(vehicle, fuelLevel)
+    fuelSynced = DecorExistOn(vehicle, Config.FuelDecor)
 
-		fuelSynced = true
-	end
-
-	if IsVehicleEngineOn(vehicle) then
-		SetFuel(vehicle, GetVehicleFuelLevel(vehicle) - Config.FuelUsage[Round(GetVehicleCurrentRpm(vehicle), 1)] * (Config.Classes[GetVehicleClass(vehicle)] or 1.0) / 10)
-	end
+    if IsVehicleEngineOn(vehicle) then
+        local rpm = GetVehicleCurrentRpm(vehicle)
+        local usage = Config.FuelUsage[Round(rpm, 1)] * (Config.Classes[GetVehicleClass(vehicle)] or 1.0) / 10
+        SetFuel(vehicle, GetVehicleFuelLevel(vehicle) - usage)
+    end
 end
 
 Citizen.CreateThread(function()
-	DecorRegister(Config.FuelDecor, 1)
+    DecorRegister(Config.FuelDecor, 1)
+    for _, v in ipairs(Config.Blacklist) do
+        Config.Blacklist[type(v) == 'string' and GetHashKey(v) or v] = true
+    end
 
-	for index = 1, #Config.Blacklist do
-		if type(Config.Blacklist[index]) == 'string' then
-			Config.Blacklist[GetHashKey(Config.Blacklist[index])] = true
-		else
-			Config.Blacklist[Config.Blacklist[index]] = true
-		end
-	end
+    while true do
+        Citizen.Wait(1000)
+        local ped, vehicle = PlayerPedId(), GetVehiclePedIsIn(PlayerPedId(), false)
+        inBlacklisted = vehicle and Config.Blacklist[GetEntityModel(vehicle)] or false
 
-	for index = #Config.Blacklist, 1, -1 do
-		table.remove(Config.Blacklist, index)
-	end
+        if not inBlacklisted and vehicle and GetPedInVehicleSeat(vehicle, -1) == ped then
+            ManageFuelUsage(vehicle)
+        end
+    end
+end)
 
-	while true do
-		Citizen.Wait(1000)
+function FindNearestFuelPump()
+    local playerCoords, shortestDistance = GetEntityCoords(PlayerPedId()), math.huge
+    local nearestPumpObject, nearestPumpCoords
 
-		local ped = PlayerPedId()
+    for _, model in pairs(Config.gasPumpModels) do
+        local hash = GetHashKey(model)
+        local pump = GetClosestObjectOfType(playerCoords, 10.0, hash, false, false, false)
+        if pump then
+            local pumpCoords = GetEntityCoords(pump)
+            local distance = #(playerCoords - pumpCoords)
+            if distance < shortestDistance then
+                shortestDistance, nearestPumpObject, nearestPumpCoords = distance, pump, pumpCoords
+            end
+        end
+    end
+    return nearestPumpObject, nearestPumpCoords
+end
 
-		if IsPedInAnyVehicle(ped) then
-			local vehicle = GetVehiclePedIsIn(ped)
+local performanceBoost = {
+    [87] = { fieldName = 'fInitialDriveForce', value = 1.0 },
+    [89] = { fieldName = 'fInitialDriveForce', value = 2.05 },
+    [91] = { fieldName = 'fInitialDriveForce', value = 3.1 }
+}
 
-			if Config.Blacklist[GetEntityModel(vehicle)] then
-				inBlacklisted = true
-			else
-				inBlacklisted = false
+target:addGlobalObject({
+    entity = pumpObject,
+    label = 'Fuel Pump',
+    icon = 'fa-solid fa-gas-pump',
+    command = 'fueltest'
+})
+
+lib.registerContext({
+    id = 'fuel_options',
+    title = 'Fuel Type',
+    canClose = true,
+    options = {
+        { title = 'Refuel with 87 - $1.50 per unit', event = 'start_refueling', args = { pumpObject = pumpObject, fuelType = 87 } },
+        { title = 'Refuel with 89 - $1.70 per unit', event = 'start_refueling', args = { pumpObject = pumpObject, fuelType = 89 } },
+        { title = 'Refuel with 91 - $1.90 per unit', event = 'start_refueling', args = { pumpObject = pumpObject, fuelType = 91 } }
+    }
+})
+
+RegisterCommand('fueltest', function(source)
+    lib.showContext('fuel_options')
+end)
+
+RegisterNetEvent('start_refueling')
+AddEventHandler('start_refueling', function(args)
+    local pumpObject = args.pumpObject
+    local fuelType = args.fuelType
+    local ped = PlayerPedId()
+    local vehicle = GetPlayersLastVehicle()
+    local maxFuel = 100.0
+
+    if vehicle and DoesEntityExist(vehicle) then
+        local vehicleCoords = GetEntityCoords(vehicle)
+        local pedCoords = GetEntityCoords(ped)
+        if GetDistanceBetweenCoords(pedCoords, vehicleCoords, true) < 2.5 then
+            local currentFuel = GetVehicleFuelLevel(vehicle)
+            local fuelNeeded = maxFuel - currentFuel
+            local fuelRate = 1.50
+            local duration = fuelNeeded / fuelRate * 1000
+
+            local player = NDCore.getPlayer()
+            local playerPossibleCash = player.cash
+            local extraCost = fuelNeeded / 10 * Config.FuelTypes[fuelType].currentPrice
+
+            if playerPossibleCash < extraCost then
+                print("Not enough cash to refuel.")
+                return
+            end
+
+            local cancel = false
+            local progress = 0
+
+            Citizen.CreateThread(function()
+                if lib.progressBar({
+                    duration = duration,
+                    label = string.format('Refueling...'),
+                    canCancel = true,
+                    disable = {
+                        move = true,
+                        car = true,
+                        combat = true,
+                    }
+                }) then
+                    print('Refueling complete')
+                else
+                    print('Refueling cancelled')
+                    cancel = true
+                end
+            end)
+
+            while not cancel and currentFuel < maxFuel do
+                Citizen.Wait(1000 / fuelRate)
+                if IsControlJustReleased(0, 38) then
+                    cancel = true
+                    break
+                end
+                currentFuel = currentFuel + 1
+                progress = math.floor((currentFuel / maxFuel) * 100)
+                if currentFuel > maxFuel then
+                    currentFuel = maxFuel
+                end
+                SetFuel(vehicle, currentFuel)
+            end
+
+			if not cancel then
+				TriggerServerEvent('fuel:pay', extraCost)
+			
+				local boost = performanceBoost[fuelType]
+				if boost then
+					SetVehicleHandlingFloat(vehicle, 'CHandlingData', boost.fieldName, boost.value)
+					print(string.format("Vehicle received a performance boost with fuel type %d", fuelType))
+					print("New " .. boost.fieldName .. " value: " .. GetVehicleHandlingFloat(vehicle, 'CHandlingData', boost.fieldName))
+				end
 			end
+		
+            isFueling = false
+            currentCost = 0.0
+        else
+            print("Player is not near the vehicle or vehicle not found for refueling.")
+        end
+    else
+        print("No vehicle found for refueling.")
+    end
+end)
 
-			if not inBlacklisted and GetPedInVehicleSeat(vehicle, -1) == ped then
-				ManageFuelUsage(vehicle)
-			end
-		else
-			if fuelSynced then
-				fuelSynced = false
-			end
-
-			if inBlacklisted then
-				inBlacklisted = false
-			end
-		end
+AddEventHandler('fuel:stopRefuelFromPump', function()
+	if isFueling then
+		ShutOffPump = true
 	end
 end)
 
-CreateThread(function()
-	while true do
-		Wait(250)
+AddEventHandler('fuel:refuelFromPump', function(ped, vehicle)
+    isFueling = true
+    TriggerEvent('fuel:startFuelUpTick', true, ped, vehicle)
+    local player = NDCore.getPlayer()
+    local playerPossibleCash = player.cash
 
-		local pumpObject, pumpDistance = FindNearestFuelPump()
+    while isFueling do
+        local vehicleCoords = GetEntityCoords(vehicle)
+        local extraString = ""
 
-		if pumpDistance < 2.5 then
-			isNearPump = pumpObject
-			NDCore.Functions.GetSelectedCharacter().cash = RegisterNetEvent("ND:updateMoney", function(cash)
-				print(cash)
-			end)
-		else
-			isNearPump = false
+        if playerPossibleCash >= currentCost then
+            SetFuel(vehicle, currentFuel)
+            extraString = "\n" .. Config.Strings.TotalCost .. ": ~g~$" .. Round(currentCost, 1)
+        end
 
-			Wait(math.ceil(pumpDistance * 20))
-		end
-	end
+        Citizen.Wait(0)
+    end
 end)
 
-AddEventHandler('VN_Fuel:startFuelUpTick', function(pumpObject, ped, vehicle)
-	currentFuel = GetVehicleFuelLevel(vehicle)
-
-	while isFueling do
-		Citizen.Wait(500)
-
-		local oldFuel = DecorGetFloat(vehicle, Config.FuelDecor)
-		local fuelToAdd = math.random(10, 20) / 10.0
-		local extraCost = fuelToAdd / 1.5 * Config.CostMultiplier
-
-		if not pumpObject then
-			if GetAmmoInPedWeapon(ped, 883325847) - fuelToAdd * 100 >= 0 then
-				currentFuel = oldFuel + fuelToAdd
-
-				SetPedAmmo(ped, 883325847, math.floor(GetAmmoInPedWeapon(ped, 883325847) - fuelToAdd * 100))
-			else
-				isFueling = false
-			end
-		else
-			currentFuel = oldFuel + fuelToAdd
-		end
-
-		if currentFuel > 100.0 then
-			currentFuel = 100.0
-			isFueling = false
-		end
-
-		currentCost = currentCost + extraCost
-
-		if NDCore.Functions.GetSelectedCharacter().cash >= currentCost then
-			SetFuel(vehicle, currentFuel)
-		else
-			isFueling = false
-		end
-	end
-
-	if pumpObject then
-		TriggerServerEvent('VN_Fuel:pay', currentCost)
-	end
-
-	currentCost = 0.0
-end)
-
-AddEventHandler('VN_Fuel:refuelFromPump', function(pumpObject, ped, vehicle)
+AddEventHandler('fuel:refuelFromJerryCan', function(ped, vehicle)
 	TaskTurnPedToFaceEntity(ped, vehicle, 1000)
 	Citizen.Wait(1000)
 	SetCurrentPedWeapon(ped, -1569615261, true)
+	isFueling = true
 	LoadAnimDict("timetable@gardener@filling_can")
 	TaskPlayAnim(ped, "timetable@gardener@filling_can", "gar_ig_5_filling_can", 2.0, 8.0, -1, 50, 0, 0, 0, 0)
 
-	TriggerEvent('VN_Fuel:startFuelUpTick', pumpObject, ped, vehicle)
+	TriggerEvent('fuel:startFuelUpTick', false, ped, vehicle)
 
 	while isFueling do
 		for _, controlIndex in pairs(Config.DisableKeys) do
@@ -144,26 +199,13 @@ AddEventHandler('VN_Fuel:refuelFromPump', function(pumpObject, ped, vehicle)
 		end
 
 		local vehicleCoords = GetEntityCoords(vehicle)
-
-		if pumpObject then
-			local stringCoords = GetEntityCoords(pumpObject)
-			local extraString = ""
-
-			if Config.UseESX then
-				extraString = "\n" .. Config.Strings.TotalCost .. ": ~g~$" .. Round(currentCost, 1)
-			end
-
-			DrawText3Ds(stringCoords.x, stringCoords.y, stringCoords.z + 1.2, Config.Strings.CancelFuelingPump .. extraString)
-			DrawText3Ds(vehicleCoords.x, vehicleCoords.y, vehicleCoords.z + 0.5, Round(currentFuel, 1) .. "%")
-		else
-			DrawText3Ds(vehicleCoords.x, vehicleCoords.y, vehicleCoords.z + 0.5, Config.Strings.CancelFuelingJerryCan .. "\nGas can: ~g~" .. Round(GetAmmoInPedWeapon(ped, 883325847) / 4500 * 100, 1) .. "% | Vehicle: " .. Round(currentFuel, 1) .. "%")
-		end
+		DrawText3Ds(vehicleCoords.x, vehicleCoords.y, vehicleCoords.z + 0.5, Config.Strings.CancelFuelingJerryCan .. "\nGas can: ~g~" .. Round(GetAmmoInPedWeapon(ped, 883325847) / 4500 * 100, 1) .. "% | Vehicle: " .. Round(currentFuel, 1) .. "%")
 
 		if not IsEntityPlayingAnim(ped, "timetable@gardener@filling_can", "gar_ig_5_filling_can", 3) then
 			TaskPlayAnim(ped, "timetable@gardener@filling_can", "gar_ig_5_filling_can", 2.0, 8.0, -1, 50, 0, 0, 0, 0)
 		end
 
-		if IsControlJustReleased(0, 38) or DoesEntityExist(GetPedInVehicleSeat(vehicle, -1)) or (isNearPump and GetEntityHealth(pumpObject) <= 0) then
+		if IsControlJustReleased(0, 38) or DoesEntityExist(GetPedInVehicleSeat(vehicle, -1)) then
 			isFueling = false
 		end
 
@@ -174,96 +216,40 @@ AddEventHandler('VN_Fuel:refuelFromPump', function(pumpObject, ped, vehicle)
 	RemoveAnimDict("timetable@gardener@filling_can")
 end)
 
-Citizen.CreateThread(function()
-	while true do
+--[[AddEventHandler('fuel:requestJerryCanPurchase', function()
+	if Config.UseESX then
+		currentCash = ESX.GetPlayerData().money
+	end
+	if currentCash >= Config.JerryCanCost then
 		local ped = PlayerPedId()
+		if not HasPedGotWeapon(ped, 883325847) then
+			ShowNotification(Config.Strings.PurchaseJerryCan)
+			GiveWeaponToPed(ped, 883325847, 4500, false, true)
+			TriggerServerEvent('fuel:pay', Config.JerryCanCost)
+		else
+			if Config.UseESX then
+				local refillCost = Round(Config.RefillCost * (1 - GetAmmoInPedWeapon(ped, 883325847) / 4500))
 
-		if not isFueling and ((isNearPump and GetEntityHealth(isNearPump) > 0) or (GetSelectedPedWeapon(ped) == 883325847 and not isNearPump)) then
-			if IsPedInAnyVehicle(ped) and GetPedInVehicleSeat(GetVehiclePedIsIn(ped), -1) == ped then
-				local pumpCoords = GetEntityCoords(isNearPump)
-
-				DrawText3Ds(pumpCoords.x, pumpCoords.y, pumpCoords.z + 1.2, Config.Strings.ExitVehicle)
-			else
-				local vehicle = GetPlayersLastVehicle()
-				local vehicleCoords = GetEntityCoords(vehicle)
-
-				if DoesEntityExist(vehicle) and GetDistanceBetweenCoords(GetEntityCoords(ped), vehicleCoords) < 2.5 then
-					if not DoesEntityExist(GetPedInVehicleSeat(vehicle, -1)) then
-						local stringCoords = GetEntityCoords(isNearPump)
-						local canFuel = true
-
-						if GetSelectedPedWeapon(ped) == 883325847 then
-							stringCoords = vehicleCoords
-
-							if GetAmmoInPedWeapon(ped, 883325847) < 100 then
-								canFuel = false
-							end
-						end
-
-						if GetVehicleFuelLevel(vehicle) < 95 and canFuel then
-							if NDCore.Functions.GetSelectedCharacter().cash > 0 then
-								DrawText3Ds(stringCoords.x, stringCoords.y, stringCoords.z + 1.2, Config.Strings.EToRefuel)
-
-								if IsControlJustReleased(0, 38) then
-									isFueling = true
-
-									TriggerEvent('VN_Fuel:refuelFromPump', isNearPump, ped, vehicle)
-									LoadAnimDict("timetable@gardener@filling_can")
-								end
-							else
-								DrawText3Ds(stringCoords.x, stringCoords.y, stringCoords.z + 1.2, Config.Strings.NotEnoughCash)
-							end
-						elseif not canFuel then
-							DrawText3Ds(stringCoords.x, stringCoords.y, stringCoords.z + 1.2, Config.Strings.JerryCanEmpty)
-						else
-							DrawText3Ds(stringCoords.x, stringCoords.y, stringCoords.z + 1.2, Config.Strings.FullTank)
-						end
-					end
-				elseif isNearPump then
-					local stringCoords = GetEntityCoords(isNearPump)
-
-					if NDCore.Functions.GetSelectedCharacter().cash >= Config.JerryCanCost then
-						if not HasPedGotWeapon(ped, 883325847) then
-							DrawText3Ds(stringCoords.x, stringCoords.y, stringCoords.z + 1.2, Config.Strings.PurchaseJerryCan)
-
-							if IsControlJustReleased(0, 38) then
-								TriggerServerEvent('QBCore:Server:AddItem', "weapon_petrolcan", 1)
-								TriggerEvent("inventory:client:ItemBox", QBCore.Shared.Items["weapon_petrolcan"], "add")
-								TriggerServerEvent('VN_Fuel:pay', Config.JerryCanCost, GetPlayerServerId(PlayerId()))
-							end
-						else
-							local refillCost = Round(Config.RefillCost * (1 - GetAmmoInPedWeapon(ped, 883325847) / 4500))
-
-							if refillCost > 0 then
-								if NDCore.Functions.GetSelectedCharacter().cash >= refillCost then
-									DrawText3Ds(stringCoords.x, stringCoords.y, stringCoords.z + 1.2, Config.Strings.RefillJerryCan .. refillCost)
-
-									if IsControlJustReleased(0, 38) then
-										TriggerServerEvent('VN_Fuel:pay', refillCost, GetPlayerServerId(PlayerId()))
-
-										SetPedAmmo(ped, 883325847, 4500)
-									end
-								else
-									DrawText3Ds(stringCoords.x, stringCoords.y, stringCoords.z + 1.2, Config.Strings.NotEnoughCashJerryCan)
-								end
-							else
-								DrawText3Ds(stringCoords.x, stringCoords.y, stringCoords.z + 1.2, Config.Strings.JerryCanFull)
-							end
-						end
+				if refillCost > 0 then
+					if currentCash >= refillCost then
+						ShowNotification(Config.Strings.RefillJerryCan .. "~g~$" .. refillCost)
+						TriggerServerEvent('fuel:pay', refillCost)
+						SetPedAmmo(ped, 883325847, 4500)
 					else
-						DrawText3Ds(stringCoords.x, stringCoords.y, stringCoords.z + 1.2, Config.Strings.NotEnoughCash)
+						ShowNotification(Config.Strings.NotEnoughCashJerryCan)
 					end
 				else
-					Wait(250)
+					ShowNotification(Config.Strings.JerryCanFull)
 				end
+			else
+				ShowNotification(Config.Strings.RefillJerryCan)
+				SetPedAmmo(ped, 883325847, 4500)
 			end
-		else
-			Wait(250)
 		end
-
-		Wait(0)
+	else
+		ShowNotification(Config.Strings.NotEnoughCash)
 	end
-end)
+end)]]--
 
 if Config.ShowNearestGasStationOnly then
 	Citizen.CreateThread(function()
@@ -315,7 +301,6 @@ if Config.EnableHUD then
 		AddTextComponentString(text)
 		DrawText(x - 0.1+w, y - 0.02+h)
 	end
-
 	local mph = 0
 	local kmh = 0
 	local fuel = 0

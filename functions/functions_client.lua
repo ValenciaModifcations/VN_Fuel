@@ -19,21 +19,6 @@ function LoadAnimDict(dict)
 	end
 end
 
-function DrawText3Ds(x, y, z, text)
-	local onScreen,_x,_y=World3dToScreen2d(x,y,z)
-
-	if onScreen then
-		SetTextScale(0.35, 0.35)
-		SetTextFont(4)
-		SetTextProportional(1)
-		SetTextColour(255, 255, 255, 215)
-		SetTextEntry("STRING")
-		SetTextCentre(1)
-		AddTextComponentString(text)
-		DrawText(_x,_y)
-	end
-end
-
 function Round(num, numDecimalPlaces)
 	local mult = 10^(numDecimalPlaces or 0)
 
@@ -56,33 +41,23 @@ function CreateBlip(coords)
 	return blip
 end
 
-function FindNearestFuelPump()
-	local coords = GetEntityCoords(PlayerPedId())
-	local fuelPumps = {}
-	local handle, object = FindFirstObject()
-	local success
+function DrawText3Ds(x, y, z, text)
+	local onScreen,_x,_y=World3dToScreen2d(x,y,z)
 
-	repeat
-		if Config.PumpModels[GetEntityModel(object)] then
-			table.insert(fuelPumps, object)
-		end
-
-		success, object = FindNextObject(handle, object)
-	until not success
-
-	EndFindObject(handle)
-
-	local pumpObject = 0
-	local pumpDistance = 1000
-
-	for _, fuelPumpObject in pairs(fuelPumps) do
-		local dstcheck = GetDistanceBetweenCoords(coords, GetEntityCoords(fuelPumpObject))
-
-		if dstcheck < pumpDistance then
-			pumpDistance = dstcheck
-			pumpObject = fuelPumpObject
-		end
+	if onScreen then
+		SetTextScale(0.35, 0.35)
+		SetTextFont(4)
+		SetTextProportional(1)
+		SetTextColour(255, 255, 255, 215)
+		SetTextEntry("STRING")
+		SetTextCentre(1)
+		AddTextComponentString(text)
+		DrawText(_x,_y)
 	end
+end
 
-	return pumpObject, pumpDistance
+function ShowNotification(msg)
+	SetNotificationTextEntry('STRING')
+	AddTextComponentString(msg)
+	DrawNotification(0,1)
 end

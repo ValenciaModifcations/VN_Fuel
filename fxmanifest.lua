@@ -3,11 +3,11 @@ game 'gta5'
 
 author 'Valencia Modifcations'
 description 'Legacy Fuel for ND_Core'
-version '1.3'
+version '2'
+lua54 "yes"
 
 -- Source https://github.com/ValenciaModifcations/VN_Fuel
 
--- What to run
 client_scripts {
 	'config.lua',
 	'functions/functions_client.lua',
@@ -17,6 +17,12 @@ client_scripts {
 server_scripts {
 	'config.lua',
 	'source/fuel_server.lua'
+}
+
+shared_scripts {
+	"@ND_Core/init.lua",
+	"config.lua",
+	"@ox_lib/init.lua"
 }
 
 exports {
