@@ -1,32 +1,48 @@
-### About
-Started off as my first script, and for whatever reason, I decided to release it. As it was pretty badly created, I felt like I should rewrite it and make a better version, so ended up spending a few hours doing so.
+# VN_Fuel (Beta)
 
-### Installation
-1) Download the latest version in the "code" tab on GitHub.
-2) Drag & drop the folder into your `resources` server folder.
-3) Configure the config file to your liking.
-4) Add `start LegacyFuel` to your server config.
+VN_Fuel provides a fuel system and hud system for vehicles. It allows you to select 87, 89, or 91. 87 and 91 adds a performance boost to vehicles.
 
-### Exports
-There are currently two (client-sided) exports available, which should help you control the fuel level for vehicles whenever needed.
+## Features
 
-```
-SetFuel(vehicle --[[ Vehicle ]], value --[[ Number: (0-100) ]])
-GetFuel(vehicle --[[ Vehicle ]]) -- Returns the vehicle's fuel level.
-```
+- **Dynamic Fuel Usage**: Vehicles consume fuel based on RPM and vehicle class, requiring players to refuel.
+- **Fuel Types**: Offers three types of fuel, each with a unique cost and performance boost. ** WORK IN PROGRESS. DYNAMIC PRICES ARE PLANNED FOR EACH OF THE THREE FUELS. **
+- **Performance Boost**: Vehicles receive a performance boost upon refueling, depending on the type of fuel used. ** WORK IN PROGRESS. REQUIRES TESTING. **
+- **Progress Bar**: A progress bar is displayed to players while refueling, enhancing the user experience.
 
-**Example usage:**
-```
-function SpawnVehicle(modelHash)
-    local vehicle = CreateVehicle(modelHash, coords.x, coords.y, coords.z, true, false)
+## Installation
 
-    exports["LegacyFuel"]:SetFuel(vehicle, 100)
-end
+Ensure that ND_Core, ox_target, and ox_lib are all started before this script in your server.cfg
 
-function StoreVehicleInGarage(vehicle)
-    local plate = GetVehicleNumberPlateText(vehicle)
-    local fuelLevel = exports["LegacyFuel"]:GetFuel(vehicle)
+1. Clone the repository or download the ZIP file.
+2. Extract the files to your `resources` directory in your FiveM server.
+3. Add `ensure VN_Fuel` to your server's `server.cfg` file.
+4. Start your server or restart the resource if the server is already running.
 
-    TriggerServerEvent('vehiclesStored', plate, fuelLevel)
-end
-```
+## Usage
+
+Players must drive to the nearest fuel pump where they can refuel their vehicle. The script checks if the player has enough money before refueling starts. If not, it cancels the process. Players can press "E" to stop refueling at any time.
+
+The script is currently in beta. Functionality such as fuel consumption, performance boosts, and user interaction are subject to change based on feedback and further development.
+
+## Contributing
+
+As this project is in beta, contributions, suggestions, and bug reports are welcome. Please open an issue or pull request with your contributions.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE.md file for details.
+
+## Acknowledgments
+
+- This script was developed for the ND_Framework and is intended for use with the ox_target / ox_lib modules.
+- Thanks to StoicBear for his assistance while I was figuring out ox_target.
+
+## Contact
+
+Please open an issue or dm me (overseershawn) directly on discord.
+
+## Disclaimer
+
+This script is provided "as is", without warranty of any kind, express or implied. The authors are not responsible for any damages or losses caused by the use of this script.
+
+Thank you for trying out the VN_Fuel for FiveM. Remember, this is a beta release, and your feedback is crucial for its improvement!
