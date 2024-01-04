@@ -28,7 +28,7 @@ The script is currently in beta. Functionality such as fuel consumption, perform
 
 As this project is in beta, contributions, suggestions, and bug reports are welcome. Please open an issue or pull request with your contributions.
 
-# notes
+# Notes
 
 If you intend to use this script, and edit it then release it; please credit Valencia Modifcationss with a link back to here.
 
@@ -43,7 +43,7 @@ This project is licensed under the MIT License - see the LICENSE.md file for det
 
 ## Contact
 
-Please open an issue or dm me (overseershawn) directly on discord.
+Please open an issue on github or join here: https://discord.gg/6UMwBG4q for support.
 
 ## Disclaimer
 
