@@ -28,6 +28,10 @@ The script is currently in beta. Functionality such as fuel consumption, perform
 
 As this project is in beta, contributions, suggestions, and bug reports are welcome. Please open an issue or pull request with your contributions.
 
+# notes
+
+If you intend to use this script, and edit it then release it; please credit Valencia Modifcationss with a link back to here.
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE.md file for details.
