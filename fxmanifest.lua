@@ -9,13 +9,11 @@ lua54 "yes"
 -- Source https://github.com/ValenciaModifcations/VN_Fuel
 
 client_scripts {
-	'config.lua',
 	'functions/functions_client.lua',
 	'source/fuel_client.lua'
 }
 
 server_scripts {
-	'config.lua',
 	'source/fuel_server.lua'
 }
 
