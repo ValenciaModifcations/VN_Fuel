@@ -132,33 +132,37 @@ AddEventHandler('start_refueling', function(args)
                 end
             end)
 
-			while not cancel and currentFuel < maxFuel do
-				Citizen.Wait(1000 / fuelRate)
-			
-				currentFuel = currentFuel + 1
-				progress = math.floor((currentFuel / maxFuel) * 100)
-			
-				if currentFuel > maxFuel then
-					currentFuel = maxFuel
-				end
-			
-				SetFuel(vehicle, currentFuel)
-			
-				if fuelType == 87 then
-					SetVehicleCheatPowerIncrease(vehicle, 1.0)
-				elseif fuelType == 89 then
-					SetVehicleCheatPowerIncrease(vehicle, 1.2)
-				elseif fuelType == 91 then
-					SetVehicleCheatPowerIncrease(vehicle, 1.3)
-				end
-			
-				if currentFuel >= maxFuel then
-					TriggerEvent('fuel:completeRefueling', vehicle, fuelType, initialFuel, maxFuel)
-					return
-				end
-			end
+            -- Freeze the vehicle
+            FreezeEntityPosition(vehicle, true)
 
-            isFueling = false
+            while not cancel and currentFuel < maxFuel do
+                Citizen.Wait(1000 / fuelRate)
+                
+                currentFuel = currentFuel + 1
+                progress = math.floor((currentFuel / maxFuel) * 100)
+                
+                if currentFuel > maxFuel then
+                    currentFuel = maxFuel
+                end
+                
+                SetFuel(vehicle, currentFuel)
+                
+                if fuelType == 87 then
+                    SetVehicleCheatPowerIncrease(vehicle, 1.0)
+                elseif fuelType == 89 then
+                    SetVehicleCheatPowerIncrease(vehicle, 1.2)
+                elseif fuelType == 91 then
+                    SetVehicleCheatPowerIncrease(vehicle, 1.3)
+                end
+                
+                if currentFuel >= maxFuel then
+                    TriggerEvent('fuel:completeRefueling', vehicle, fuelType, initialFuel, maxFuel)
+                    break -- Break the loop when refueling is complete
+                end
+            end
+
+            -- Unfreeze the vehicle when refueling is complete or canceled
+            FreezeEntityPosition(vehicle, false)
 
             if paymentThread then
                 Citizen.Wait(500)  -- Wait for a short time to ensure the payment thread completes
